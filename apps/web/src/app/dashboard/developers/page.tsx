@@ -205,7 +205,7 @@ function ApiKeysTab() {
               value={
                 secretRevealed
                   ? keys?.secretKey ?? ""
-                  : maskSecret(keys?.secretKey ?? "scripts_secret_key_")}
+                  : maskSecret(keys?.secretKey ?? "scripts_secret_key_")
               }
               className="font-mono text-sm"
             />

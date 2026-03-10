@@ -1,0 +1,190 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [vector]
+}
+
+// ─── Enums ───────────────────────────────────────────────
+
+enum Role {
+  USER
+  MERCHANT
+  ADMIN
+}
+
+enum TxStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum Currency {
+  VND
+  USD
+  EUR
+}
+
+enum EntryType {
+  DEBIT
+  CREDIT
+}
+
+enum BalanceType {
+  PENDING
+  AVAILABLE
+}
+
+enum PaymentMethod {
+  QR
+  CARD
+  EWALLET
+}
+
+// ─── Core Models ─────────────────────────────────────────
+
+/// Links to Supabase Auth — `id` matches the Auth UUID.
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  merchantProfile  MerchantProfile?
+  customerPayments Transaction[]    @relation("CustomerTransactions")
+  ledgerEntries    LedgerEntry[]
+
+  @@index([role])
+}
+
+/// 1-to-1 with User (role = MERCHANT).
+model MerchantProfile {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  businessName  String
+  taxId         String?
+  isKycApproved Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  apiKeys          ApiKey[]
+  webhookEndpoints WebhookEndpoint[]
+  transactions     Transaction[]     @relation("MerchantTransactions")
+  apiRequestLogs   ApiRequestLog[]
+}
+
+/// Public / Secret key pair for a merchant.
+model ApiKey {
+  id         String   @id @default(uuid())
+  merchantId String
+  publicKey  String   @unique
+  secretKey  String   @unique
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  merchant MerchantProfile @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId])
+}
+
+/// Webhook endpoint registered by a merchant.
+model WebhookEndpoint {
+  id         String   @id @default(uuid())
+  merchantId String
+  url        String
+  secret     String // HMAC-SHA256 signing secret
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  merchant MerchantProfile @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId])
+}
+
+/// Payment Intent — the central transaction record.
+model Transaction {
+  id             String        @id @default(uuid())
+  amount         Decimal       @db.Decimal(19, 4)
+  currency       Currency      @default(VND)
+  status         TxStatus      @default(PENDING)
+  method         PaymentMethod
+  idempotencyKey String        @unique
+  metadata       Json?
+  merchantId     String
+  customerId     String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  merchant      MerchantProfile @relation("MerchantTransactions", fields: [merchantId], references: [id], onDelete: Restrict)
+  customer      User?           @relation("CustomerTransactions", fields: [customerId], references: [id], onDelete: SetNull)
+  ledgerEntries LedgerEntry[]
+
+  @@index([merchantId])
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+/// Double-entry ledger line — IMMUTABLE (no onUpdate, restrict deletes).
+model LedgerEntry {
+  id            String      @id @default(uuid())
+  accountId     String
+  type          EntryType
+  amount        Decimal     @db.Decimal(19, 4)
+  currency      Currency
+  balanceType   BalanceType
+  transactionId String
+  description   String?
+  createdAt     DateTime    @default(now())
+
+  account     User        @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+
+  @@index([accountId])
+  @@index([transactionId])
+  @@index([createdAt])
+}
+
+/// Logs every API request for the Context-Aware AI Debugger.
+model ApiRequestLog {
+  id           String   @id @default(uuid())
+  merchantId   String
+  method       String
+  endpoint     String
+  statusCode   Int
+  requestBody  Json?
+  responseBody Json?
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  merchant MerchantProfile @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId])
+  @@index([createdAt])
+  @@index([merchantId, createdAt])
+}
+
+/// Stores document chunks + pgvector embeddings for AI RAG.
+model DocEmbedding {
+  id        String                      @id @default(uuid())
+  content   String
+  embedding Unsupported("vector(1536)")
+  createdAt DateTime                    @default(now())
+}
+
+/// Lightweight model for the health-check endpoint.
+model HealthCheck {
+  id        String   @id @default(cuid())
+  status    String
+  checkedAt DateTime @default(now())
+}

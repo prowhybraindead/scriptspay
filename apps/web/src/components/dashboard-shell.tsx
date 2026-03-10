@@ -15,6 +15,7 @@ import {
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ScriptsLogoIcon } from "@/components/scripts-logo";
 
 const sidebarLinks = [
   { href: "/dashboard", label: "Home", icon: Home },
@@ -43,9 +44,15 @@ export function DashboardShell({
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Sidebar */}
       <aside className="hidden w-64 flex-col border-r bg-card md:flex">
-        <div className="flex h-14 items-center px-6">
-          <Link href="/dashboard" className="text-xl font-bold tracking-tight">
-            Scripts<span className="text-primary">_</span>
+        <div className="flex h-16 items-center px-5">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-3 text-xl font-semibold tracking-tight text-[#1A2B47]"
+          >
+            <ScriptsLogoIcon className="h-9 w-9" />
+            <span className="text-[24px] leading-none">
+              Scripts<span className="text-[#10B981]">_</span>
+            </span>
           </Link>
         </div>
         <Separator />

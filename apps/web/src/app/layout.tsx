@@ -9,6 +9,9 @@ export const metadata: Metadata = {
   title: "Scripts_ | Payment Gateway Sandbox",
   description:
     "Enterprise-grade Payment Gateway Sandbox for the Vietnamese market. VietQR, E-wallets, Stripe-like DX.",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

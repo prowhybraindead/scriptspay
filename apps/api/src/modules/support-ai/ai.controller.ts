@@ -33,19 +33,15 @@ export class AiController {
       "and uses an LLM to diagnose integration errors in real-time.",
   })
   async debugMerchantIntegration(
-    @Body() body: { query: string; merchantId: string },
+    @Body() body: { query: string },
     @Req() req: AuthenticatedRequest,
   ) {
     if (!body.query?.trim()) {
       throw new BadRequestException("query must be a non-empty string.");
     }
 
-    if (!body.merchantId?.trim()) {
-      throw new BadRequestException("merchantId is required.");
-    }
-
     return this.aiService.analyzeMerchantLogs(
-      body.merchantId,
+      req.user.userId,
       body.query.trim(),
     );
   }

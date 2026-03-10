@@ -2,29 +2,51 @@ import {
   Controller,
   Post,
   Body,
-  Param,
+  Req,
   UseGuards,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { AiService } from "./ai.service";
 import { SupabaseAuthGuard } from "../auth/auth.guard";
+import { Request } from "express";
+
+interface AuthenticatedRequest extends Request {
+  user: { userId: string; email: string; role: string };
+}
 
 @ApiTags("Support AI")
 @ApiBearerAuth()
-@Controller("v1/support")
+@Controller("v1/ai")
 export class AiController {
   constructor(private readonly aiService: AiService) {}
 
-  @Post("merchants/:merchantId/analyze")
+  @Post("debug")
   @HttpCode(HttpStatus.OK)
   @UseGuards(SupabaseAuthGuard)
-  @ApiOperation({ summary: "AI-powered analysis of merchant API logs" })
-  async analyzeMerchantLogs(
-    @Param("merchantId") merchantId: string,
-    @Body() body: { query: string },
+  @ApiOperation({
+    summary: "AI-powered analysis of merchant API integration logs",
+    description:
+      "Fetches the last 5 API request logs for the authenticated merchant " +
+      "and uses an LLM to diagnose integration errors in real-time.",
+  })
+  async debugMerchantIntegration(
+    @Body() body: { query: string; merchantId: string },
+    @Req() req: AuthenticatedRequest,
   ) {
-    return this.aiService.analyzeMerchantLogs(merchantId, body.query);
+    if (!body.query?.trim()) {
+      throw new BadRequestException("query must be a non-empty string.");
+    }
+
+    if (!body.merchantId?.trim()) {
+      throw new BadRequestException("merchantId is required.");
+    }
+
+    return this.aiService.analyzeMerchantLogs(
+      body.merchantId,
+      body.query.trim(),
+    );
   }
 }

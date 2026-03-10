@@ -10,3 +10,4 @@ coverage/
 .vercel
 .output
 prisma/*.db
+AI.md

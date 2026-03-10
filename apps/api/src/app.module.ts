@@ -4,6 +4,7 @@ import { ThrottlerModule } from "@nestjs/throttler";
 import { BullModule } from "@nestjs/bullmq";
 import { HealthModule } from "./modules/health/health.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { RedisModule } from "./common/redis/redis.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { PaymentModule } from "./modules/payment/payment.module";
 import { LedgerModule } from "./modules/ledger/ledger.module";
@@ -23,6 +24,7 @@ import { AiModule } from "./modules/support-ai/ai.module";
       },
     }),
     PrismaModule,
+    RedisModule,
     HealthModule,
     AuthModule,
     PaymentModule,

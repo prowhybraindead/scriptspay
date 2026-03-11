@@ -6,7 +6,7 @@
     "dev": "nest start --watch",
     "build": "prisma generate && nest build",
     "start": "node dist/main",
-    "start:prod": "node dist/main",
+    "start:prod": "prisma db push --skip-generate --accept-data-loss && node dist/main",
     "lint": "eslint \"{src,test}/**/*.ts\"",
     "clean": "rimraf dist .turbo node_modules",
     "prisma:generate": "prisma generate",

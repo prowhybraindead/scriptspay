@@ -136,7 +136,7 @@ export function CheckoutCard({ intentId }: CheckoutCardProps) {
           setPolling(true);
         }
 
-        const response = await fetch(`${getApiBaseUrl()}/checkout/${intentId}`, {
+        const response = await fetch(`${getApiBaseUrl()}/checkout/${intentId}?format=json`, {
           cache: "no-store",
         });
 

@@ -3,6 +3,7 @@ import {
   Logger,
   ConflictException,
   BadRequestException,
+  NotFoundException,
 } from "@nestjs/common";
 import { Inject } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -111,6 +112,24 @@ export class PaymentService {
     this.logger.log(
       `Payment intent created: id=${transaction.id} status=${status} amount=${dto.amount} ${dto.currency}`,
     );
+
+    return transaction;
+  }
+
+  async getMerchantTransactionById(
+    merchantId: string,
+    transactionId: string,
+  ): Promise<Transaction> {
+    const transaction = await this.prisma.transaction.findFirst({
+      where: {
+        id: transactionId,
+        merchantId,
+      },
+    });
+
+    if (!transaction) {
+      throw new NotFoundException("Checkout session not found.");
+    }
 
     return transaction;
   }

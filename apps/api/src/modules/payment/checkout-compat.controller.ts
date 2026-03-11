@@ -123,6 +123,15 @@ export class CheckoutCompatController {
     };
   }
 
+  @Get("assets/hosted.js")
+  @ApiOperation({
+    summary: "Hosted checkout frontend script (CSP-safe external file)",
+  })
+  getHostedScript(@Res() res: Response) {
+    res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+    return res.send(this.renderHostedCheckoutScript());
+  }
+
   @Get(":checkoutId")
   @ApiOperation({
     summary: "Public hosted checkout endpoint for browser redirects",
@@ -194,7 +203,20 @@ export class CheckoutCompatController {
   }
 
   private renderHostedCheckoutHtml(payload: ReturnType<CheckoutCompatController["serializePublicCheckout"]>): string {
-    const safePayload = JSON.stringify(payload).replace(/</g, "\\u003c");
+    const attrs = {
+      checkoutId: this.escapeHtmlAttr(payload.checkoutId),
+      merchantOrderId: this.escapeHtmlAttr(payload.merchantOrderId ?? ""),
+      status: this.escapeHtmlAttr(payload.status),
+      isFinal: String(payload.isFinal),
+      amount: String(payload.amount),
+      currency: this.escapeHtmlAttr(payload.currency),
+      paymentMethod: this.escapeHtmlAttr(payload.paymentMethod),
+      createdAt: this.escapeHtmlAttr(payload.createdAt),
+      expiresAt: this.escapeHtmlAttr(payload.expiresAt),
+      description: this.escapeHtmlAttr(payload.description ?? ""),
+      redirectUrl: this.escapeHtmlAttr(payload.redirectUrl ?? ""),
+      updatedAt: this.escapeHtmlAttr(payload.updatedAt),
+    };
 
     return `<!doctype html>
 <html lang="vi">
@@ -202,6 +224,7 @@ export class CheckoutCompatController {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Playhub Checkout</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='8' fill='%23020617'/%3E%3Ctext x='8' y='11' font-size='8' text-anchor='middle' fill='%2322d3ee'%3EP%3C/text%3E%3C/svg%3E" />
     <style>
       :root {
         --bg: #020617;
@@ -331,89 +354,166 @@ export class CheckoutCompatController {
       </section>
     </main>
 
-    <script>
-      const state = ${safePayload};
-
-      const formatVND = (value) => new Intl.NumberFormat("vi-VN", {
-        style: "currency",
-        currency: "VND",
-        maximumFractionDigits: 0,
-      }).format(Number(value || 0));
-
-      const inferPlan = (merchantOrderId, amount) => {
-        const value = String(merchantOrderId || "").toLowerCase();
-        if (value.includes("neon")) return ["Dolphin Neon", "Unlimited everything, custom themes, and early access."];
-        if (value.includes("friend")) return ["Dolphin Friend", "Extra chat slots, priority API, and Friend badge."];
-        if (Number(amount) >= 200000) return ["Dolphin Neon", "Unlimited everything, custom themes, and early access."];
-        return ["Dolphin Friend", "Extra chat slots, priority API, and Friend badge."];
-      };
-
-      const updateStatus = (status) => {
-        const pill = document.getElementById("status-pill");
-        const hint = document.getElementById("status-hint");
-        pill.className = "pill";
-
-        if (status === "completed") {
-          pill.classList.add("ok");
-          pill.textContent = "Thanh toan thanh cong";
-          hint.textContent = "Ban co the quay lai Playhub, plan se tu duoc nang cap ngay.";
-          return;
-        }
-
-        if (status === "failed") {
-          pill.classList.add("fail");
-          pill.textContent = "Thanh toan that bai";
-          hint.textContent = "Giao dich that bai. Vui long quay lai Playhub de tao checkout moi.";
-          return;
-        }
-
-        pill.classList.add("pending");
-        pill.textContent = "Dang cho thanh toan...";
-        hint.textContent = "He thong dang doi xac nhan tu ngan hang.";
-      };
-
-      const render = (data) => {
-        const [planName, fallbackDesc] = inferPlan(data.merchantOrderId, data.amount);
-        document.getElementById("plan").textContent = planName;
-        document.getElementById("description").textContent = data.description || fallbackDesc;
-        document.getElementById("amount").textContent = formatVND(data.amount);
-        document.getElementById("merchant-order").textContent = data.merchantOrderId || data.checkoutId;
-        document.getElementById("method").textContent = data.paymentMethod || "QR";
-        document.getElementById("updated-at").textContent = new Date(data.updatedAt).toLocaleString("vi-VN");
-        document.getElementById("qr").src = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent("playhub:" + data.checkoutId + ":" + data.amount);
-        updateStatus(data.status);
-      };
-
-      const startCountdown = (expiresAt) => {
-        const el = document.getElementById("countdown");
-        const tick = () => {
-          const ms = Math.max(0, new Date(expiresAt).getTime() - Date.now());
-          const mm = Math.floor(ms / 60000).toString().padStart(2, "0");
-          const ss = Math.floor((ms % 60000) / 1000).toString().padStart(2, "0");
-          el.textContent = mm + ":" + ss;
-        };
-        tick();
-        setInterval(tick, 1000);
-      };
-
-      const poll = async () => {
-        if (state.status !== "pending") return;
-        try {
-          const res = await fetch("/checkout/" + state.checkoutId + "?format=json", { cache: "no-store" });
-          if (!res.ok) return;
-          const fresh = await res.json();
-          Object.assign(state, fresh);
-          render(state);
-        } catch {
-          void 0;
-        }
-      };
-
-      render(state);
-      startCountdown(state.expiresAt);
-      setInterval(poll, 3000);
-    </script>
+    <div
+      id="checkout-state"
+      data-checkout-id="${attrs.checkoutId}"
+      data-merchant-order-id="${attrs.merchantOrderId}"
+      data-status="${attrs.status}"
+      data-is-final="${attrs.isFinal}"
+      data-amount="${attrs.amount}"
+      data-currency="${attrs.currency}"
+      data-payment-method="${attrs.paymentMethod}"
+      data-created-at="${attrs.createdAt}"
+      data-expires-at="${attrs.expiresAt}"
+      data-description="${attrs.description}"
+      data-redirect-url="${attrs.redirectUrl}"
+      data-updated-at="${attrs.updatedAt}"
+      hidden
+    ></div>
+    <script src="/checkout/assets/hosted.js" defer></script>
   </body>
 </html>`;
+  }
+
+  private renderHostedCheckoutScript(): string {
+    return `(() => {
+  const stateNode = document.getElementById("checkout-state");
+  if (!stateNode) return;
+
+  const state = {
+    checkoutId: stateNode.dataset.checkoutId || "",
+    merchantOrderId: stateNode.dataset.merchantOrderId || null,
+    status: stateNode.dataset.status || "pending",
+    isFinal: stateNode.dataset.isFinal === "true",
+    amount: Number(stateNode.dataset.amount || "0"),
+    currency: stateNode.dataset.currency || "VND",
+    paymentMethod: stateNode.dataset.paymentMethod || "QR",
+    createdAt: stateNode.dataset.createdAt || "",
+    expiresAt: stateNode.dataset.expiresAt || "",
+    description: stateNode.dataset.description || null,
+    redirectUrl: stateNode.dataset.redirectUrl || null,
+    updatedAt: stateNode.dataset.updatedAt || "",
+  };
+
+  const formatVND = (value) => new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
+
+  const inferPlan = (merchantOrderId, amount) => {
+    const value = String(merchantOrderId || "").toLowerCase();
+    if (value.includes("neon")) return ["Dolphin Neon", "Unlimited everything, custom themes, and early access."];
+    if (value.includes("friend")) return ["Dolphin Friend", "Extra chat slots, priority API, and Friend badge."];
+    if (Number(amount) >= 200000) return ["Dolphin Neon", "Unlimited everything, custom themes, and early access."];
+    return ["Dolphin Friend", "Extra chat slots, priority API, and Friend badge."];
+  };
+
+  const updateStatus = (status) => {
+    const pill = document.getElementById("status-pill");
+    const hint = document.getElementById("status-hint");
+    if (!pill || !hint) return;
+
+    pill.className = "pill";
+
+    if (status === "completed") {
+      pill.classList.add("ok");
+      pill.textContent = "Thanh toan thanh cong";
+      hint.textContent = "Ban co the quay lai Playhub, plan se tu duoc nang cap ngay.";
+      return;
+    }
+
+    if (status === "failed") {
+      pill.classList.add("fail");
+      pill.textContent = "Thanh toan that bai";
+      hint.textContent = "Giao dich that bai. Vui long quay lai Playhub de tao checkout moi.";
+      return;
+    }
+
+    if (status === "refunded") {
+      pill.classList.add("pending");
+      pill.textContent = "Da hoan tien";
+      hint.textContent = "Giao dich da duoc hoan tien.";
+      return;
+    }
+
+    pill.classList.add("pending");
+    pill.textContent = "Dang cho thanh toan...";
+    hint.textContent = "He thong dang doi xac nhan tu ngan hang.";
+  };
+
+  const render = (data) => {
+    const planEl = document.getElementById("plan");
+    const descEl = document.getElementById("description");
+    const amountEl = document.getElementById("amount");
+    const orderEl = document.getElementById("merchant-order");
+    const methodEl = document.getElementById("method");
+    const updatedEl = document.getElementById("updated-at");
+    const qrEl = document.getElementById("qr");
+
+    if (!planEl || !descEl || !amountEl || !orderEl || !methodEl || !updatedEl || !qrEl) {
+      return;
+    }
+
+    const [planName, fallbackDesc] = inferPlan(data.merchantOrderId, data.amount);
+    planEl.textContent = planName;
+    descEl.textContent = data.description || fallbackDesc;
+    amountEl.textContent = formatVND(data.amount);
+    orderEl.textContent = data.merchantOrderId || data.checkoutId;
+    methodEl.textContent = data.paymentMethod || "QR";
+    updatedEl.textContent = data.updatedAt ? new Date(data.updatedAt).toLocaleString("vi-VN") : "-";
+    qrEl.src = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent("playhub:" + data.checkoutId + ":" + data.amount);
+
+    updateStatus(data.status);
+  };
+
+  const startCountdown = (expiresAt) => {
+    const countdownEl = document.getElementById("countdown");
+    if (!countdownEl) return;
+
+    const tick = () => {
+      const end = new Date(expiresAt).getTime();
+      if (Number.isNaN(end)) {
+        countdownEl.textContent = "--:--";
+        return;
+      }
+
+      const ms = Math.max(0, end - Date.now());
+      const mm = Math.floor(ms / 60000).toString().padStart(2, "0");
+      const ss = Math.floor((ms % 60000) / 1000).toString().padStart(2, "0");
+      countdownEl.textContent = mm + ":" + ss;
+    };
+
+    tick();
+    setInterval(tick, 1000);
+  };
+
+  const poll = async () => {
+    if (state.status !== "pending") return;
+
+    try {
+      const res = await fetch("/checkout/" + state.checkoutId + "?format=json", { cache: "no-store" });
+      if (!res.ok) return;
+
+      const fresh = await res.json();
+      Object.assign(state, fresh);
+      render(state);
+    } catch {
+      return;
+    }
+  };
+
+  render(state);
+  startCountdown(state.expiresAt);
+  setInterval(poll, 3000);
+})();`;
+  }
+
+  private escapeHtmlAttr(value: string): string {
+    return value
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   }
 }

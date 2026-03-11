@@ -134,6 +134,18 @@ export class PaymentService {
     return transaction;
   }
 
+  async getTransactionById(transactionId: string): Promise<Transaction> {
+    const transaction = await this.prisma.transaction.findUnique({
+      where: { id: transactionId },
+    });
+
+    if (!transaction) {
+      throw new NotFoundException("Checkout session not found.");
+    }
+
+    return transaction;
+  }
+
   // ════════════════════════════════════════════════════════════════════
   // PRIVATE — Magic Test Data resolver
   // ════════════════════════════════════════════════════════════════════

@@ -44,18 +44,18 @@ type CreateCheckoutBody = {
   description:
     "Alternative server-to-server authentication using the merchant secret key (sk_test_...).",
 })
-@UseGuards(SupabaseAuthGuard)
-@Controller("v1/checkout")
-export class CheckoutController {
+@Controller("checkout")
+export class CheckoutCompatController {
   constructor(
     private readonly paymentService: PaymentService,
     private readonly merchantService: MerchantService,
   ) {}
 
   @Post("create")
+  @UseGuards(SupabaseAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
-    summary: "Create a checkout session using bearer auth or merchant secret key",
+    summary: "Create a checkout session (compatibility route) using bearer auth or merchant secret key",
   })
   @ApiHeader({
     name: "Idempotency-Key",
@@ -123,48 +123,15 @@ export class CheckoutController {
 
   @Get(":checkoutId")
   @ApiOperation({
-    summary: "Get checkout session status by checkoutId using bearer auth or merchant secret key",
+    summary: "Public hosted checkout endpoint for browser redirects",
   })
   @ApiParam({
     name: "checkoutId",
-    description: "Checkout session ID returned from /v1/checkout/create",
+    description: "Checkout session ID returned from /checkout/create",
   })
-  async getCheckoutStatus(
-    @Param("checkoutId") checkoutId: string,
-    @Req() req: AuthenticatedRequest,
-  ) {
-    const profile = await this.merchantService.ensureMerchantProfile(
-      req.user.userId,
-      req.user.email,
-    );
-    const tx = await this.paymentService.getMerchantTransactionById(
-      profile.id,
-      checkoutId,
-    );
-
-    return this.serializeCheckoutStatus(tx);
-  }
-
-  @Get(":checkoutId/status")
-  @ApiOperation({
-    summary: "Get checkout status only (polling-friendly alias) using bearer auth or merchant secret key",
-  })
-  @ApiParam({
-    name: "checkoutId",
-    description: "Checkout session ID returned from /v1/checkout/create",
-  })
-  async getCheckoutStatusAlias(
-    @Param("checkoutId") checkoutId: string,
-    @Req() req: AuthenticatedRequest,
-  ) {
-    const statusPayload = await this.getCheckoutStatus(checkoutId, req);
-    return {
-      checkoutId: statusPayload.checkoutId,
-      merchantOrderId: statusPayload.merchantOrderId,
-      status: statusPayload.status,
-      isFinal: statusPayload.isFinal,
-      updatedAt: statusPayload.updatedAt,
-    };
+  async getPublicCheckout(@Param("checkoutId") checkoutId: string) {
+    const tx = await this.paymentService.getTransactionById(checkoutId);
+    return this.serializePublicCheckout(tx);
   }
 
   private mapCheckoutStatus(status: TxStatus): string {
@@ -182,14 +149,13 @@ export class CheckoutController {
     }
   }
 
-  private serializeCheckoutStatus(tx: Transaction) {
+  private serializePublicCheckout(tx: Transaction) {
     const metadata =
       tx.metadata && typeof tx.metadata === "object" && !Array.isArray(tx.metadata)
         ? (tx.metadata as Record<string, unknown>)
         : {};
 
     const normalizedStatus = this.mapCheckoutStatus(tx.status);
-    const isFinal = normalizedStatus !== "pending";
 
     return {
       checkoutId: tx.id,
@@ -198,12 +164,10 @@ export class CheckoutController {
           ? metadata.merchantOrderId
           : null,
       status: normalizedStatus,
-      isFinal,
-      transactionId: tx.id,
+      isFinal: normalizedStatus !== "pending",
       amount: Number(tx.amount.toString()),
       currency: tx.currency,
       paymentMethod: tx.method,
-      completedAt: isFinal ? tx.updatedAt.toISOString() : null,
       updatedAt: tx.updatedAt.toISOString(),
     };
   }

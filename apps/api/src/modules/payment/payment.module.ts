@@ -7,6 +7,7 @@ import { LedgerModule } from "../ledger/ledger.module";
 import { WebhookModule } from "../webhook/webhook.module";
 import { MerchantModule } from "../merchant/merchant.module";
 import { CheckoutController } from "./checkout.controller";
+import { CheckoutCompatController } from "./checkout-compat.controller";
 
 @Module({
   imports: [
@@ -16,7 +17,7 @@ import { CheckoutController } from "./checkout.controller";
     MerchantModule,
     BullModule.registerQueue({ name: "webhook-delivery" }),
   ],
-  controllers: [PaymentController, CheckoutController],
+  controllers: [PaymentController, CheckoutController, CheckoutCompatController],
   providers: [PaymentService],
   exports: [PaymentService],
 })

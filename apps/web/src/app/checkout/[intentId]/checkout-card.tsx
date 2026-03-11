@@ -1,180 +1,327 @@
 "use client";
 
-import { useState } from "react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, CheckCircle2, Loader2, QrCode } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { QrCode, CreditCard, CheckCircle2, Info, Landmark, WalletCards } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 interface CheckoutCardProps {
   intentId: string;
 }
 
-export function CheckoutCard({ intentId }: CheckoutCardProps) {
-  const [paying, setPaying] = useState(false);
-  const [paid, setPaid] = useState(false);
-  const [selectedRail, setSelectedRail] = useState<"vietqr" | "bank" | "wallet">("vietqr");
+type CheckoutStatus = "pending" | "completed" | "failed" | "refunded";
 
-  // In a real implementation this would come from the API
-  const amount = 10_000;
+type PublicCheckout = {
+  checkoutId: string;
+  merchantOrderId: string | null;
+  status: CheckoutStatus;
+  isFinal: boolean;
+  amount: number;
+  currency: string;
+  paymentMethod: string;
+  updatedAt: string;
+  createdAt: string;
+  expiresAt: string;
+  description: string | null;
+  redirectUrl: string | null;
+};
 
-  function formatVND(value: number): string {
-    return new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-      maximumFractionDigits: 0,
-    }).format(value);
+type PlanContent = {
+  name: string;
+  description: string;
+};
+
+function formatVND(value: number): string {
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function getApiBaseUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+  return raw.trim().replace(/\/+$/, "");
+}
+
+function parsePlanFromMerchantOrderId(merchantOrderId: string | null, amount: number): PlanContent {
+  const fallback = amount >= 200_000
+    ? {
+        name: "Dolphin Neon",
+        description: "Unlimited everything, custom themes, and early access.",
+      }
+    : {
+        name: "Dolphin Friend",
+        description: "Extra chat slots, priority API, and Friend badge.",
+      };
+
+  if (!merchantOrderId) {
+    return fallback;
   }
 
-  async function handlePay() {
-    setPaying(true);
-    // Simulate network latency
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setPaid(true);
-    setPaying(false);
-    toast.success("Payment successful!", {
-      description: `${formatVND(amount)} has been processed.`,
-    });
+  const normalized = merchantOrderId.toLowerCase();
+  if (normalized.includes("neon")) {
+    return {
+      name: "Dolphin Neon",
+      description: "Unlimited everything, custom themes, and early access.",
+    };
   }
 
-  const paymentRails = [
-    { id: "vietqr", label: "VietQR", subtitle: "Fastest sandbox path", icon: QrCode },
-    { id: "bank", label: "Bank transfer", subtitle: "Manual approval feel", icon: Landmark },
-    { id: "wallet", label: "E-wallet", subtitle: "Mobile-first checkout", icon: WalletCards },
-  ] as const;
+  if (normalized.includes("friend")) {
+    return {
+      name: "Dolphin Friend",
+      description: "Extra chat slots, priority API, and Friend badge.",
+    };
+  }
 
+  return fallback;
+}
+
+function PlayhubLogo() {
   return (
-    <div className="w-full space-y-4">
-      <Card className="overflow-hidden rounded-[32px] border-white/70 bg-white/88 shadow-[0_30px_80px_-34px_rgba(15,23,42,0.35)] backdrop-blur-xl">
-        <CardHeader className="text-center sm:text-left">
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-[22px] bg-primary/10 sm:mx-0">
-            <CreditCard className="h-6 w-6 text-primary" />
-          </div>
-          <CardTitle className="text-2xl tracking-[-0.04em]">
-            Scripts<span className="text-primary">_</span> Checkout
-          </CardTitle>
-          <CardDescription>Complete your payment in a polished sandbox flow</CardDescription>
-        </CardHeader>
+    <svg width="220" height="48" viewBox="0 0 220 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="ph-ocean" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#22d3ee" />
+          <stop offset="100%" stopColor="#a855f7" />
+        </linearGradient>
+      </defs>
+      <rect
+        x="0.5"
+        y="0.5"
+        width="219"
+        height="47"
+        rx="12"
+        fill="#020617"
+        fillOpacity="0.85"
+        stroke="url(#ph-ocean)"
+        strokeOpacity="0.4"
+      />
+      <path
+        d="M34 10C29 10 25.5 11.8 23 14.5C20.5 17.2 19.2 20.8 19 23C21 21.5 23.6 21.3 25.4 21.6C25.1 22.4 25 23.2 25 24C25 28.4 28.6 32 33 32C36.7 32 39.8 29.8 40.9 26.7C42.4 27.7 44.5 28 46 28C45.2 26.5 44.8 24.9 44.7 23.5C44.5 21.3 45 19.2 45.7 17.7C43.6 17.6 41.6 17.1 39.9 16.3C38.1 15.5 36.7 14.4 35.7 13.4C35.4 13.1 35.1 12.8 34.9 12.5C34.6 11.7 34.3 10.9 34 10Z"
+        fill="url(#ph-ocean)"
+      />
+      <circle cx="33" cy="16" r="1.2" fill="#0f172a" />
+      <text
+        x="68"
+        y="29"
+        fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        fontSize="20"
+        fontWeight="700"
+        letterSpacing="0.04em"
+        fill="#e5f6ff"
+      >
+        Play
+        <tspan fill="url(#ph-ocean)">hub</tspan>
+      </text>
+    </svg>
+  );
+}
 
-        <CardContent className="space-y-6">
-          <div className="grid gap-3 sm:grid-cols-3">
-            {paymentRails.map(({ id, label, subtitle, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setSelectedRail(id)}
-                className={cn(
-                  "rounded-[24px] border px-4 py-4 text-left transition",
-                  selectedRail === id
-                    ? "border-primary bg-primary/10 shadow-sm"
-                    : "border-slate-200 bg-slate-50/80 hover:border-primary/30 hover:bg-white",
-                )}
-              >
-                <Icon className="h-5 w-5 text-primary" />
-                <p className="mt-4 font-semibold text-slate-950">{label}</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">{subtitle}</p>
-              </button>
-            ))}
-          </div>
+export function CheckoutCard({ intentId }: CheckoutCardProps) {
+  const [checkout, setCheckout] = useState<PublicCheckout | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [polling, setPolling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [countdownMs, setCountdownMs] = useState(0);
 
-          <div className="space-y-3 rounded-[28px] bg-slate-100/70 p-5">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-500">Intent ID</span>
-              <code className="rounded-full bg-white px-3 py-1 text-xs text-slate-700">
-                {intentId.slice(0, 20)}{intentId.length > 20 ? "…" : ""}
-              </code>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">Amount Due</span>
-              <span className="text-3xl font-bold tracking-[-0.05em] text-slate-950">{formatVND(amount)}</span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-500">
-              <span>Payment rail</span>
-              <span className="rounded-full bg-white px-3 py-1 font-medium text-slate-700">
-                {paymentRails.find((rail) => rail.id === selectedRail)?.label}
-              </span>
-            </div>
-          </div>
+  useEffect(() => {
+    let active = true;
 
-          <Separator />
+    const fetchCheckout = async () => {
+      try {
+        if (!checkout) {
+          setLoading(true);
+        } else {
+          setPolling(true);
+        }
 
-          <div className="flex flex-col items-center gap-3">
-            <p className="text-sm font-medium text-slate-500">
-              {selectedRail === "vietqr" ? "Scan with your banking app" : "Sandbox payment preview"}
-            </p>
-            <div className="flex h-52 w-52 items-center justify-center rounded-[28px] border-2 border-dashed border-slate-300 bg-slate-50/90">
-              {paid ? (
-                <CheckCircle2 className="h-16 w-16 text-green-500" />
-              ) : (
-                <div className="flex flex-col items-center gap-2 text-slate-500">
-                  {selectedRail === "vietqr" ? <QrCode className="h-16 w-16" /> : <WalletCards className="h-16 w-16" />}
-                  <span className="text-xs">{selectedRail === "vietqr" ? "VietQR placeholder" : "Sandbox payment sheet"}</span>
-                </div>
-              )}
-            </div>
-            <Badge variant="secondary" className="rounded-full px-3 py-1 text-xs">
-              {paymentRails.find((rail) => rail.id === selectedRail)?.label} · Sandbox mode
-            </Badge>
-          </div>
+        const response = await fetch(`${getApiBaseUrl()}/checkout/${intentId}`, {
+          cache: "no-store",
+        });
 
-          <Separator />
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.message ?? "Could not load checkout status.");
+        }
 
-          {paid ? (
-            <div className="flex flex-col items-center gap-2 rounded-[24px] bg-green-500/10 py-5">
-              <CheckCircle2 className="h-8 w-8 text-green-600" />
-              <p className="font-semibold text-green-600">Payment Complete</p>
-              <p className="text-xs text-muted-foreground">
-                You may close this page.
-              </p>
-            </div>
-          ) : (
-            <Button
-              className="w-full rounded-2xl bg-slate-950 py-6 text-base hover:bg-slate-800"
-              size="lg"
-              onClick={handlePay}
-              disabled={paying}
-            >
-              {paying ? "Processing..." : `Simulate Payment — ${formatVND(amount)}`}
-            </Button>
-          )}
-        </CardContent>
+        const data = (await response.json()) as PublicCheckout;
+        if (!active) return;
 
-        <CardFooter className="justify-between gap-4 border-t border-slate-200/80 bg-slate-50/70 text-xs text-muted-foreground">
-          <p>
-            Secured by Scripts<span className="text-primary">_</span> Payment
-            Gateway
-          </p>
-          <p>Hosted sandbox flow</p>
-        </CardFooter>
-      </Card>
+        setCheckout(data);
+        setError(null);
+      } catch (err) {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : "Could not load checkout status.");
+      } finally {
+        if (!active) return;
+        setLoading(false);
+        setPolling(false);
+      }
+    };
 
-      <div className="flex items-start gap-2 rounded-[24px] border border-dashed border-amber-300/60 bg-amber-50/90 px-4 py-4">
-        <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-        <div className="text-xs text-amber-800">
-          <p className="font-semibold">Developer — Magic Test Data</p>
-          <div className="mt-2 grid gap-2 sm:grid-cols-3">
-            {[
-              ["10,000 VND", "Instant success"],
-              ["40,000 VND", "Insufficient funds"],
-              ["50,408 VND", "Pending then random resolution"],
-            ].map(([value, description]) => (
-              <div key={value} className="rounded-2xl bg-amber-100/80 px-3 py-2 text-amber-900">
-                <p className="font-semibold">{value}</p>
-                <p className="mt-1 text-[11px] leading-5">{description}</p>
-              </div>
-            ))}
+    void fetchCheckout();
+    const interval = setInterval(() => {
+      if (!checkout?.isFinal) {
+        void fetchCheckout();
+      }
+    }, 3000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [intentId, checkout?.isFinal]);
+
+  useEffect(() => {
+    if (!checkout) return;
+
+    const tick = () => {
+      const expiresAt = new Date(checkout.expiresAt).getTime();
+      setCountdownMs(Math.max(0, expiresAt - Date.now()));
+    };
+
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [checkout]);
+
+  const countdown = useMemo(() => {
+    const minutes = Math.floor(countdownMs / 60_000);
+    const seconds = Math.floor((countdownMs % 60_000) / 1000);
+    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+  }, [countdownMs]);
+
+  const plan = useMemo(() => {
+    if (!checkout) {
+      return {
+        name: "Dolphin Friend",
+        description: "Extra chat slots, priority API, and Friend badge.",
+      };
+    }
+
+    return parsePlanFromMerchantOrderId(checkout.merchantOrderId, checkout.amount);
+  }, [checkout]);
+
+  if (loading) {
+    return (
+      <div className="rounded-3xl border border-cyan-300/20 bg-slate-900/60 p-10 text-slate-100 backdrop-blur-xl">
+        <div className="flex items-center gap-3 text-cyan-200">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Dang tai thong tin thanh toan...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !checkout) {
+    return (
+      <div className="rounded-3xl border border-rose-400/30 bg-rose-500/10 p-6 text-rose-100 backdrop-blur-xl">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="mt-0.5 h-5 w-5" />
+          <div>
+            <p className="font-semibold">Khong the tai checkout</p>
+            <p className="mt-1 text-sm text-rose-200">{error ?? "Lien ket khong hop le hoac da het han."}</p>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  const qrPayload = `playhub:${checkout.checkoutId}:${checkout.amount}`;
+
+  return (
+    <div className="relative overflow-hidden rounded-[30px] border border-cyan-300/20 bg-slate-950/70 p-5 shadow-[0_28px_80px_-35px_rgba(34,211,238,0.45)] backdrop-blur-2xl sm:p-6">
+      <div className="pointer-events-none absolute -top-32 right-0 h-72 w-72 rounded-full bg-fuchsia-500/20 blur-3xl" />
+      <div className="pointer-events-none absolute -left-28 bottom-4 h-64 w-64 rounded-full bg-cyan-400/20 blur-3xl" />
+
+      <header className="relative mb-6 flex flex-col gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-center sm:justify-between">
+        <PlayhubLogo />
+        <div className="text-left sm:text-right">
+          <p className="text-sm font-semibold text-cyan-100">Secured by Scripts</p>
+          <p className="text-xs text-slate-300">Payment sandbox - no real charges</p>
+        </div>
+      </header>
+
+      <div className="relative grid gap-4 lg:grid-cols-2">
+        <section className="rounded-3xl border border-white/10 bg-white/5 p-5">
+          <p className="text-xs uppercase tracking-[0.18em] text-cyan-200">Thong tin don hang</p>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight text-white">{plan.name}</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-300">{checkout.description ?? plan.description}</p>
+
+          <div className="mt-5 rounded-2xl border border-cyan-300/20 bg-slate-900/70 p-4">
+            <p className="text-xs text-slate-400">Gia thanh toan</p>
+            <p className="mt-1 text-4xl font-bold tracking-tight text-cyan-200">{formatVND(checkout.amount)}</p>
+            <p className="mt-2 text-xs text-slate-400">Ma don: {checkout.merchantOrderId ?? checkout.checkoutId}</p>
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-white/10 bg-white/5 p-5">
+          <p className="text-xs uppercase tracking-[0.18em] text-cyan-200">VietQR</p>
+          <div className="mt-3 flex justify-center rounded-2xl border border-dashed border-cyan-300/40 bg-slate-900/80 p-4">
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrPayload)}`}
+              alt="VietQR checkout"
+              className="h-52 w-52 rounded-xl bg-white p-2"
+            />
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-xl border border-white/10 bg-slate-900/80 p-3">
+              <p className="text-xs text-slate-400">Amount (VND)</p>
+              <p className="mt-1 font-semibold text-white">{formatVND(checkout.amount)}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-slate-900/80 p-3">
+              <p className="text-xs text-slate-400">Expiry countdown</p>
+              <p className="mt-1 font-semibold text-fuchsia-200">{countdown}</p>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-white/10 bg-slate-900/75 p-4">
+            {checkout.status === "pending" && (
+              <Badge className="rounded-full border border-cyan-300/40 bg-cyan-500/15 text-cyan-100 hover:bg-cyan-500/15">
+                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> Dang cho thanh toan...
+              </Badge>
+            )}
+            {checkout.status === "completed" && (
+              <Badge className="rounded-full border border-emerald-300/50 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/20">
+                <CheckCircle2 className="mr-2 h-3.5 w-3.5" /> Thanh toan thanh cong
+              </Badge>
+            )}
+            {checkout.status === "failed" && (
+              <Badge className="rounded-full border border-rose-300/50 bg-rose-500/20 text-rose-100 hover:bg-rose-500/20">
+                <AlertCircle className="mr-2 h-3.5 w-3.5" /> Thanh toan that bai
+              </Badge>
+            )}
+            {checkout.status === "refunded" && (
+              <Badge className="rounded-full border border-amber-300/50 bg-amber-500/20 text-amber-100 hover:bg-amber-500/20">
+                <QrCode className="mr-2 h-3.5 w-3.5" /> Giao dich da hoan tien
+              </Badge>
+            )}
+
+            <p className="mt-3 text-sm text-slate-300">
+              {checkout.status === "completed"
+                ? "Ban co the quay lai Playhub, plan se tu duoc nang cap ngay."
+                : checkout.status === "failed"
+                  ? "Giao dich that bai. Hay thu lai de tao checkout moi."
+                  : "He thong dang doi xac nhan tu ngan hang. Trang se tu dong cap nhat."}
+            </p>
+
+            {checkout.status === "failed" && (
+              <Button
+                type="button"
+                className="mt-4 w-full rounded-xl bg-fuchsia-600 text-white hover:bg-fuchsia-500"
+                onClick={() => window.location.assign(checkout.redirectUrl ?? "/")}
+              >
+                Thu lai
+              </Button>
+            )}
+          </div>
+
+          <p className="mt-3 text-xs text-slate-400">
+            Last update: {new Date(checkout.updatedAt).toLocaleString("vi-VN")} {polling ? "- syncing..." : ""}
+          </p>
+        </section>
       </div>
     </div>
   );

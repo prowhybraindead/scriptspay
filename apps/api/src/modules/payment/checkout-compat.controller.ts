@@ -156,6 +156,8 @@ export class CheckoutCompatController {
         : {};
 
     const normalizedStatus = this.mapCheckoutStatus(tx.status);
+    const createdAt = tx.createdAt;
+    const expiresAt = new Date(createdAt.getTime() + 30 * 60 * 1000);
 
     return {
       checkoutId: tx.id,
@@ -168,6 +170,12 @@ export class CheckoutCompatController {
       amount: Number(tx.amount.toString()),
       currency: tx.currency,
       paymentMethod: tx.method,
+      createdAt: createdAt.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+      description:
+        typeof metadata.description === "string" ? metadata.description : null,
+      redirectUrl:
+        typeof metadata.redirectUrl === "string" ? metadata.redirectUrl : null,
       updatedAt: tx.updatedAt.toISOString(),
     };
   }

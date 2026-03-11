@@ -163,6 +163,9 @@ export class CheckoutController {
       merchantOrderId: statusPayload.merchantOrderId,
       status: statusPayload.status,
       isFinal: statusPayload.isFinal,
+      amount: statusPayload.amount,
+      currency: statusPayload.currency,
+      paymentMethod: statusPayload.paymentMethod,
       updatedAt: statusPayload.updatedAt,
     };
   }

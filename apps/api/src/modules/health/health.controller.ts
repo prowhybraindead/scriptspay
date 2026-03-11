@@ -8,7 +8,7 @@ export class HealthController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
-  @ApiOperation({ summary: "Health check — keeps Render/Supabase alive" })
+  @ApiOperation({ summary: "Health check for platform uptime and DB connectivity" })
   async check() {
     await this.prisma.$queryRaw`SELECT 1`;
     return { status: "ok", timestamp: new Date().toISOString() };

@@ -33,10 +33,10 @@ export default function DocsPage() {
         </p>
         <pre className="overflow-x-auto rounded-lg border bg-muted p-4 text-sm">
           <code>
-            {`BASE_URL = https://api.scriptspay.dev/v1
+            {`BASE_URL = https://api.scriptspay.dev/api/v1
 
 # Or for local development:
-BASE_URL = http://localhost:3001/v1`}
+BASE_URL = http://localhost:4000/api/v1`}
           </code>
         </pre>
         <p className="text-sm text-muted-foreground">
@@ -59,7 +59,7 @@ BASE_URL = http://localhost:3001/v1`}
         </p>
         <pre className="overflow-x-auto rounded-lg border bg-muted p-4 text-sm">
           <code>
-            {`curl -X POST https://api.scriptspay.dev/v1/payment-intents \\
+            {`curl -X POST https://api.scriptspay.dev/api/v1/payment-intents \
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer <YOUR_JWT_TOKEN>" \\
   -H "Idempotency-Key: unique-request-id-123" \\
@@ -197,7 +197,7 @@ function ScriptsCheckoutButton({ amount, merchantId }) {
 
   async function handleCheckout() {
     setLoading(true);
-    const res = await fetch('https://api.scriptspay.dev/v1/payment-intents', {
+    const res = await fetch('https://api.scriptspay.dev/api/v1/payment-intents', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

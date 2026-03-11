@@ -27,7 +27,7 @@ Designed for the Vietnamese market with VietQR support, multi-currency handling 
 | Layer | Technology | Cost |
 |---|---|---|
 | **Frontend** | Next.js 15 (App Router), React 19, TailwindCSS, shadcn/ui, Zustand | Free (Vercel) |
-| **Backend API** | NestJS, TypeScript, REST | Free (Render/Koyeb) |
+| **Backend API** | NestJS, TypeScript, REST | Free (Railway trial / Hobby) |
 | **Database** | PostgreSQL 15+ via Supabase (+ pgvector) | Free tier |
 | **Auth** | Supabase Auth (Email/Password, JWT) | Free tier |
 | **Cache / Queue** | Upstash Serverless Redis + BullMQ | Free tier |
@@ -125,7 +125,6 @@ DATABASE_URL="postgresql://..."
 DIRECT_URL="postgresql://..."
 SUPABASE_URL="https://xxx.supabase.co"
 SUPABASE_SERVICE_ROLE_KEY="eyJ..."
-SUPABASE_JWT_SECRET="your-jwt-secret"
 REDIS_HOST="xxx.upstash.io"
 REDIS_PORT=6379
 REDIS_PASSWORD="xxx"
@@ -161,26 +160,29 @@ npm run dev
 
 ## Deployment & Hosting
 
-Scripts_ is designed for the zero-dollar "Render stack" — full production deployment with no monthly cost.
+Scripts_ is ready for Railway + Vercel deployment with Supabase and Upstash.
 
 | Layer | Platform | Details |
 |---|---|---|
-| **Backend API** | [Render](https://render.com) (Free) | Web Service auto-deployed from `main`. Env vars set in Render dashboard. |
+| **Backend API** | [Railway](https://railway.app) | Deploy from repo, set root directory to `apps/api`, configure env vars in Railway dashboard. |
 | **Frontend** | [Vercel](https://vercel.com) (Free) | `apps/web` auto-deployed from `main`. Env vars set in Vercel project settings. |
 | **Database & Auth** | [Supabase](https://supabase.com) (Free tier) | PostgreSQL + Auth. `DATABASE_URL` uses the PgBouncer pooler URL. |
 | **Cache & Queue** | [Upstash Redis](https://upstash.com) (Free tier) | Serverless Redis for idempotency barrier + BullMQ webhook queue. |
 | **AI — Primary** | [Groq](https://console.groq.com) | Model: `openai/gpt-oss-20b`. 10-second timeout before failover. |
 | **AI — Backup** | [OpenRouter](https://openrouter.ai) | Model: `openai/gpt-oss-20b:free`. 30-second timeout. |
 
-### Keep-Alive: Preventing Render Cold Starts
+### Railway Deployment Notes (API)
 
-Render's free tier spins down services after 15 minutes of inactivity. To prevent cold-start latency:
+1. Create a new Railway service from this repository.
+2. Set **Root Directory** to `apps/api`.
+3. Set **Build Command** to `npm run build --workspace=apps/api`.
+4. Set **Start Command** to `npm run start:prod --workspace=apps/api`.
+5. Add env vars from `apps/api/.env.example`.
+6. Ensure `PORT` is provided by Railway (or keep default fallback in code).
 
-1. Go to [cron-job.org](https://cron-job.org) and create a free account.
-2. Add a new cron job:
-   - **URL**: `https://your-api.onrender.com/api/health`
-   - **Schedule**: Every 10 minutes (`*/10 * * * *`)
-3. The `/api/health` endpoint responds with `{ status: 'ok', timestamp }` and also pings the database — keeping both Render and Supabase warm simultaneously.
+### Keep-Alive (Optional)
+
+If you want proactive uptime checks, ping `https://your-api.up.railway.app/api/health` every 10 minutes from an external cron service.
 
 > **Total monthly cost: $0**
 

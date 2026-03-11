@@ -4,12 +4,26 @@ import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import helmet from "helmet";
 import { AppModule } from "./app.module";
 
+function parseCorsOrigins(): string[] {
+  const rawOrigins = process.env.CORS_ORIGIN;
+  if (!rawOrigins) {
+    return ["http://localhost:3000"];
+  }
+
+  const origins = rawOrigins
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  return origins.length ? origins : ["http://localhost:3000"];
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.use(helmet());
   app.enableCors({
-    origin: process.env.CORS_ORIGIN?.split(",") ?? ["http://localhost:3000"],
+    origin: parseCorsOrigins(),
     credentials: true,
   });
 

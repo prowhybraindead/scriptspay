@@ -1,9 +1,15 @@
 import { createClient } from "@/lib/supabase/client";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const RAW_API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 interface ApiRequestInit extends Omit<RequestInit, "headers"> {
   headers?: Record<string, string>;
+}
+
+function getApiBaseUrl(): string {
+  const normalized = RAW_API_BASE_URL.trim().replace(/\/+$/, "");
+  return normalized.endsWith("/api") ? normalized : `${normalized}/api`;
 }
 
 /**
@@ -30,7 +36,9 @@ export async function apiClient<T = unknown>(
     headers["Authorization"] = `Bearer ${session.access_token}`;
   }
 
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+  const res = await fetch(`${getApiBaseUrl()}${normalizedPath}`, {
     ...init,
     headers,
   });

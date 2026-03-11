@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { Role } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 
 @Injectable()
@@ -19,10 +20,18 @@ export class AuthService {
     supabaseUserId: string,
     email: string,
   ): Promise<void> {
-    // TODO: Upsert user into the local User table.
-    // - Use prisma.user.upsert({ where: { id: supabaseUserId }, ... })
-    // - Default role = USER; do NOT overwrite role if user already exists.
-    // - Log the sync event.
+    await this.prisma.user.upsert({
+      where: { id: supabaseUserId },
+      update: {
+        email,
+      },
+      create: {
+        id: supabaseUserId,
+        email,
+        role: Role.MERCHANT,
+      },
+    });
+
     this.logger.log(`syncUserFromSupabase called for ${supabaseUserId}`);
   }
 }

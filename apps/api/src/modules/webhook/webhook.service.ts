@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
+import { MerchantService } from "../merchant/merchant.service";
 
 export interface WebhookDeliverJobData {
   url: string;
@@ -21,8 +22,43 @@ export class WebhookService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly merchantService: MerchantService,
     @InjectQueue("webhook-delivery") private readonly webhookQueue: Queue,
   ) {}
+
+  async listEndpoints(userId: string, email: string) {
+    const profile = await this.merchantService.ensureMerchantProfile(userId, email);
+
+    return this.prisma.webhookEndpoint.findMany({
+      where: { merchantId: profile.id },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async createEndpoint(userId: string, email: string, url: string) {
+    const profile = await this.merchantService.ensureMerchantProfile(userId, email);
+
+    return this.prisma.webhookEndpoint.create({
+      data: {
+        merchantId: profile.id,
+        url,
+        secret: this.merchantService.buildWebhookSecret(),
+      },
+    });
+  }
+
+  async deleteEndpoint(userId: string, email: string, endpointId: string) {
+    const profile = await this.merchantService.ensureMerchantProfile(userId, email);
+
+    await this.prisma.webhookEndpoint.deleteMany({
+      where: {
+        id: endpointId,
+        merchantId: profile.id,
+      },
+    });
+
+    return { success: true };
+  }
 
   /**
    * Dispatches a webhook event to ALL active endpoints for the given merchant.

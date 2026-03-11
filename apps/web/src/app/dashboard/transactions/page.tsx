@@ -84,19 +84,21 @@ export default function TransactionsPage() {
   });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const [balData, txData] = await Promise.all([
-        apiClient<BalanceData>("/v1/merchants/balance").catch(() => ({
-          available: 2_450_000,
-          pending: 500_000,
-        })),
-        apiClient<Transaction[]>("/v1/merchants/transactions").catch(() => MOCK_TRANSACTIONS),
+        apiClient<BalanceData>("/v1/merchants/balance"),
+        apiClient<Transaction[]>("/v1/merchants/transactions"),
       ]);
       setBalance(balData);
       setTransactions(txData);
+    } catch {
+      setError("Could not load merchant transactions right now.");
+      setTransactions([]);
     } finally {
       setLoading(false);
     }
@@ -193,6 +195,11 @@ export default function TransactionsPage() {
           <CardTitle className="text-base">Recent Transactions</CardTitle>
         </CardHeader>
         <CardContent>
+          {error && (
+            <div className="mb-4 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
           {loading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
@@ -254,45 +261,3 @@ export default function TransactionsPage() {
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/*  Fallback mock data (used when API is not yet connected)            */
-/* ------------------------------------------------------------------ */
-
-const MOCK_TRANSACTIONS: Transaction[] = [
-  {
-    id: "pi_1a2b3c4d5e6f7g8h",
-    amount: 10_000,
-    status: "SUCCEEDED",
-    method: "VietQR",
-    createdAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-  },
-  {
-    id: "pi_9z8y7x6w5v4u3t2s",
-    amount: 50_408,
-    status: "PENDING",
-    method: "VietQR",
-    createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-  },
-  {
-    id: "pi_0q1w2e3r4t5y6u7i",
-    amount: 40_000,
-    status: "FAILED",
-    method: "VietQR",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-  },
-  {
-    id: "pi_8a7b6c5d4e3f2g1h",
-    amount: 250_000,
-    status: "SUCCEEDED",
-    method: "E-Wallet",
-    createdAt: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-  },
-  {
-    id: "pi_2m3n4o5p6q7r8s9t",
-    amount: 1_000_000,
-    status: "SUCCEEDED",
-    method: "VietQR",
-    createdAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-  },
-];

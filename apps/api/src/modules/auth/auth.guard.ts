@@ -7,6 +7,7 @@ import {
 import { ConfigService } from "@nestjs/config";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { Request } from "express";
+import { AuthService } from "./auth.service";
 
 interface AuthenticatedRequest extends Request {
   user?: { userId: string; email: string; role: string };
@@ -20,7 +21,10 @@ interface AuthenticatedRequest extends Request {
 export class SupabaseAuthGuard implements CanActivate {
   private supabase: SupabaseClient | null = null;
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly authService: AuthService,
+  ) {}
 
   private getSupabaseClient(): SupabaseClient {
     if (!this.supabase) {
@@ -69,6 +73,11 @@ export class SupabaseAuthGuard implements CanActivate {
       email: data.user.email ?? "",
       role,
     };
+
+    await this.authService.syncUserFromSupabase(
+      req.user.userId,
+      req.user.email,
+    );
 
     return true;
   }

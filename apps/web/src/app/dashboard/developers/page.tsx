@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -111,18 +112,17 @@ function ApiKeysTab() {
   const [secretRevealed, setSecretRevealed] = useState(false);
   const [rolling, setRolling] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchKeys = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const data = await apiClient<ApiKeys>("/v1/merchants/keys");
       setKeys(data);
     } catch {
-      // If no keys exist yet, use placeholder to show structure
-      setKeys({
-        publicKey: "scripts_public_key_placeholder",
-        secretKey: "scripts_secret_key_placeholder",
-      });
+      setError("Could not load API keys from the server.");
+      setKeys(null);
     } finally {
       setLoading(false);
     }
@@ -148,7 +148,9 @@ function ApiKeysTab() {
       setKeys(data);
       setSecretRevealed(true);
     } catch {
-      // noop — endpoint may not be implemented yet
+      toast.error("Could not rotate keys", {
+        description: "The API key rotation endpoint did not complete.",
+      });
     } finally {
       setRolling(false);
     }
@@ -156,6 +158,22 @@ function ApiKeysTab() {
 
   if (loading) {
     return <KeysSkeleton />;
+  }
+
+  if (error || !keys) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">API Keys unavailable</CardTitle>
+          <CardDescription>
+            {error ?? "Could not load API keys for this merchant."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" onClick={fetchKeys}>Retry</Button>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -289,14 +307,17 @@ function WebhooksTab() {
   const [adding, setAdding] = useState(false);
   const [revealedSecrets, setRevealedSecrets] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchEndpoints = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const data = await apiClient<WebhookEndpoint[]>("/v1/webhooks/endpoints");
       setEndpoints(data);
     } catch {
       setEndpoints([]);
+      setError("Could not load webhook endpoints from the server.");
     } finally {
       setLoading(false);
     }
@@ -312,6 +333,7 @@ function WebhooksTab() {
 
     try {
       setAdding(true);
+      setError(null);
       const endpoint = await apiClient<WebhookEndpoint>(
         "/v1/webhooks/endpoints",
         {
@@ -324,7 +346,9 @@ function WebhooksTab() {
       // Auto-reveal the new endpoint's secret so merchant can copy it
       setRevealedSecrets((prev) => new Set(prev).add(endpoint.id));
     } catch {
-      // noop — endpoint may not be implemented yet
+      toast.error("Could not add endpoint", {
+        description: "Please verify the URL and try again.",
+      });
     } finally {
       setAdding(false);
     }
@@ -338,7 +362,9 @@ function WebhooksTab() {
       });
       setEndpoints((prev) => prev.filter((ep) => ep.id !== id));
     } catch {
-      // noop
+      toast.error("Could not remove endpoint", {
+        description: "The webhook endpoint remains active.",
+      });
     }
   }
 
@@ -398,6 +424,11 @@ function WebhooksTab() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+            {error && (
+              <div className="mb-4 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
           {loading ? (
             <div className="h-24 animate-pulse rounded bg-muted" />
           ) : endpoints.length === 0 ? (

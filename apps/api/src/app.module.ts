@@ -6,6 +6,7 @@ import { HealthModule } from "./modules/health/health.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { RedisModule } from "./common/redis/redis.module";
 import { AuthModule } from "./modules/auth/auth.module";
+import { MerchantModule } from "./modules/merchant/merchant.module";
 import { PaymentModule } from "./modules/payment/payment.module";
 import { LedgerModule } from "./modules/ledger/ledger.module";
 import { WebhookModule } from "./modules/webhook/webhook.module";
@@ -30,6 +31,7 @@ import { AiModule } from "./modules/support-ai/ai.module";
     RedisModule,
     HealthModule,
     AuthModule,
+    MerchantModule,
     PaymentModule,
     LedgerModule,
     WebhookModule,

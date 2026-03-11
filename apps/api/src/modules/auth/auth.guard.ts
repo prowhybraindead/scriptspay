@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "../../prisma/prisma.service";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { Request } from "express";
 import { AuthService } from "./auth.service";
@@ -24,7 +25,63 @@ export class SupabaseAuthGuard implements CanActivate {
   constructor(
     private readonly config: ConfigService,
     private readonly authService: AuthService,
+    private readonly prisma: PrismaService,
   ) {}
+
+  private extractBearerToken(req: AuthenticatedRequest): string | null {
+    const header = req.headers.authorization;
+    if (!header?.startsWith("Bearer ")) {
+      return null;
+    }
+
+    const token = header.slice("Bearer ".length).trim();
+    return token || null;
+  }
+
+  private extractApiKey(req: AuthenticatedRequest): string | null {
+    const apiKeyHeader = req.headers["x-api-key"];
+    if (typeof apiKeyHeader === "string" && apiKeyHeader.trim()) {
+      return apiKeyHeader.trim();
+    }
+
+    const bearerToken = this.extractBearerToken(req);
+    if (bearerToken?.startsWith("sk_test_")) {
+      return bearerToken;
+    }
+
+    return null;
+  }
+
+  private async authenticateWithApiKey(
+    apiKey: string,
+    req: AuthenticatedRequest,
+  ): Promise<boolean> {
+    const keyPair = await this.prisma.apiKey.findFirst({
+      where: {
+        secretKey: apiKey,
+        isActive: true,
+      },
+      include: {
+        merchant: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    if (!keyPair) {
+      throw new UnauthorizedException("Invalid API key.");
+    }
+
+    req.user = {
+      userId: keyPair.merchant.userId,
+      email: keyPair.merchant.user.email,
+      role: keyPair.merchant.user.role.toLowerCase(),
+    };
+
+    return true;
+  }
 
   private getSupabaseClient(): SupabaseClient {
     if (!this.supabase) {
@@ -44,15 +101,14 @@ export class SupabaseAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const header = req.headers.authorization;
-
-    if (!header?.startsWith("Bearer ")) {
-      throw new UnauthorizedException("Missing bearer token.");
+    const apiKey = this.extractApiKey(req);
+    if (apiKey) {
+      return this.authenticateWithApiKey(apiKey, req);
     }
 
-    const token = header.slice("Bearer ".length).trim();
+    const token = this.extractBearerToken(req);
     if (!token) {
-      throw new UnauthorizedException("Invalid bearer token.");
+      throw new UnauthorizedException("Missing bearer token or x-api-key.");
     }
 
     const supabase = this.getSupabaseClient();

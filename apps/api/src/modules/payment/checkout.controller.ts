@@ -38,6 +38,12 @@ type CreateCheckoutBody = {
 
 @ApiTags("Checkout")
 @ApiBearerAuth()
+@ApiHeader({
+  name: "x-api-key",
+  required: false,
+  description:
+    "Alternative server-to-server authentication using the merchant secret key (sk_test_...).",
+})
 @UseGuards(SupabaseAuthGuard)
 @Controller(["v1/checkout", "checkout"])
 export class CheckoutController {
@@ -49,7 +55,7 @@ export class CheckoutController {
   @Post("create")
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
-    summary: "Create a checkout session (legacy compatibility endpoint)",
+    summary: "Create a checkout session using bearer auth or merchant secret key",
   })
   @ApiHeader({
     name: "Idempotency-Key",
@@ -117,7 +123,7 @@ export class CheckoutController {
 
   @Get(":checkoutId")
   @ApiOperation({
-    summary: "Get checkout session status by checkoutId",
+    summary: "Get checkout session status by checkoutId using bearer auth or merchant secret key",
   })
   @ApiParam({
     name: "checkoutId",
@@ -141,7 +147,7 @@ export class CheckoutController {
 
   @Get(":checkoutId/status")
   @ApiOperation({
-    summary: "Get checkout status only (polling-friendly alias)",
+    summary: "Get checkout status only (polling-friendly alias) using bearer auth or merchant secret key",
   })
   @ApiParam({
     name: "checkoutId",

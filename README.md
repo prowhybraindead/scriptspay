@@ -175,10 +175,36 @@ Scripts_ is ready for Railway + Vercel deployment with Supabase and Upstash.
 
 1. Create a new Railway service from this repository.
 2. Set **Root Directory** to `apps/api`.
-3. Set **Build Command** to `npm run build --workspace=apps/api`.
-4. Set **Start Command** to `npm run start:prod --workspace=apps/api`.
-5. Add env vars from `apps/api/.env.example`.
-6. Ensure `PORT` is provided by Railway (or keep default fallback in code).
+3. Set **Build Command** to `npm run build --workspace=@scripts-pay/api`.
+4. Add a **Pre-deploy Command**:
+  - `npm run prisma:push --workspace=@scripts-pay/api -- --accept-data-loss --skip-generate`
+5. Set **Start Command** to `npm run start --workspace=@scripts-pay/api`.
+6. Add env vars from `apps/api/.env.example`.
+7. Ensure `PORT` is provided by Railway (or keep default fallback in code).
+
+### Production Troubleshooting
+
+#### Merchant API returns 500 (`/api/v1/merchants/*`)
+
+Most common cause: production schema is not synced yet.
+
+1. Confirm Railway runs Prisma schema sync before app start.
+2. Confirm both `DATABASE_URL` and `DIRECT_URL` are set correctly.
+3. Re-deploy and verify logs contain a successful `prisma db push` before `node dist/main`.
+
+Affected endpoints usually include:
+- `/api/v1/merchants/overview`
+- `/api/v1/merchants/balance`
+- `/api/v1/merchants/transactions`
+- `/api/v1/merchants/keys`
+- `/api/v1/merchants/profile`
+
+#### AI requests fail after deploy
+
+1. Verify API base URL is correct on web (`NEXT_PUBLIC_API_URL`).
+2. Verify `CORS_ORIGIN` contains your web domain.
+3. Verify auth headers are sent (`Authorization: Bearer <token>`).
+4. Verify at least one AI provider key exists (`GROQ_API_KEY` or `OPENROUTER_API_KEY`).
 
 ### Keep-Alive (Optional)
 

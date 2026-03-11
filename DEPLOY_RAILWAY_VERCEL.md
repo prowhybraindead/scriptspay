@@ -6,8 +6,9 @@ This checklist is optimized for this monorepo structure.
 
 1. Create a new service from this repository.
 2. Set Root Directory to `apps/api`.
-3. Build Command: `npm run build --workspace=apps/api`.
-4. Start Command: `npm run start:prod --workspace=apps/api`.
+3. Build Command: `npm run build --workspace=@scripts-pay/api`.
+4. Pre-deploy Command: `npm run prisma:push --workspace=@scripts-pay/api -- --accept-data-loss --skip-generate`.
+5. Start Command: `npm run start --workspace=@scripts-pay/api`.
 5. Add API env vars from `apps/api/.env.example`.
 
 Required API env vars:
@@ -25,6 +26,7 @@ Required API env vars:
 Notes:
 - `PORT` is injected by Railway. Keep fallback in code for local only.
 - API routes are served under `/api/*` (global prefix in NestJS).
+- Use full workspace name `@scripts-pay/api` (not shortened values).
 
 ## 2. Deploy Web on Vercel
 
@@ -76,3 +78,23 @@ If any secrets were shared in logs, chats, or screenshots:
 2. Rotate DB password and update `DATABASE_URL` and `DIRECT_URL`.
 3. Rotate Upstash password and AI provider keys.
 4. Redeploy API and web with updated environment variables.
+
+## 7. If Merchant Dashboard APIs Return 500
+
+Symptoms:
+- `GET /api/v1/merchants/overview` returns 500
+- `GET /api/v1/merchants/balance` returns 500
+- `GET /api/v1/merchants/transactions` returns 500
+- `GET /api/v1/merchants/keys` returns 500
+- `GET /api/v1/merchants/profile` returns 500
+
+Checklist:
+1. Confirm Railway deployment ran `prisma db push` successfully before app start.
+2. Confirm `DIRECT_URL` points to Supabase direct connection (with `sslmode=require`).
+3. Confirm `DATABASE_URL` points to pooler runtime URL.
+4. Trigger one redeploy after env updates.
+
+Expected log order:
+1. `prisma db push ...`
+2. `node dist/main`
+3. Nest application starts and route mapping logs appear.

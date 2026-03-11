@@ -207,6 +207,32 @@ function verifyWebhook(body, header, secret) {
           </table>
         </div>
       </section>
+
+      <section className="mt-8 surface-panel p-6">
+        <h2 className="text-2xl font-semibold tracking-[-0.04em] text-slate-950">Production troubleshooting</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          Quick checks for the most common post-deploy incidents on Railway and Vercel.
+        </p>
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <div className="rounded-[24px] border border-slate-200 bg-white/80 p-5">
+            <h3 className="text-base font-semibold text-slate-950">Merchant endpoints return 500</h3>
+            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-600">
+              <li>Ensure deploy runs <span className="font-mono">prisma db push</span> before app start.</li>
+              <li>Verify both <span className="font-mono">DATABASE_URL</span> and <span className="font-mono">DIRECT_URL</span> are set.</li>
+              <li>Confirm logs show schema sync success before Nest startup logs.</li>
+            </ul>
+          </div>
+          <div className="rounded-[24px] border border-slate-200 bg-white/80 p-5">
+            <h3 className="text-base font-semibold text-slate-950">AI request fails or returns non-200</h3>
+            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-600">
+              <li>Check web env <span className="font-mono">NEXT_PUBLIC_API_URL</span> points to current API domain.</li>
+              <li>Include web origin in API <span className="font-mono">CORS_ORIGIN</span>.</li>
+              <li>Confirm bearer token is attached on protected routes.</li>
+              <li>Set at least one AI provider key (<span className="font-mono">GROQ_API_KEY</span> or <span className="font-mono">OPENROUTER_API_KEY</span>).</li>
+            </ul>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

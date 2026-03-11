@@ -405,7 +405,7 @@ export class CheckoutCompatController {
           Object.assign(state, fresh);
           render(state);
         } catch {
-          // Keep previous state on transient errors.
+          void 0;
         }
       };
 

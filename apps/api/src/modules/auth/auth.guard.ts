@@ -18,19 +18,24 @@ interface AuthenticatedRequest extends Request {
  */
 @Injectable()
 export class SupabaseAuthGuard implements CanActivate {
-  private readonly supabase: SupabaseClient;
+  private supabase: SupabaseClient | null = null;
 
-  constructor(private readonly config: ConfigService) {
-    this.supabase = createClient(
-      this.config.getOrThrow<string>("SUPABASE_URL"),
-      this.config.getOrThrow<string>("SUPABASE_SERVICE_ROLE_KEY"),
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
+  constructor(private readonly config: ConfigService) {}
+
+  private getSupabaseClient(): SupabaseClient {
+    if (!this.supabase) {
+      this.supabase = createClient(
+        this.config.getOrThrow<string>("SUPABASE_URL"),
+        this.config.getOrThrow<string>("SUPABASE_SERVICE_ROLE_KEY"),
+        {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+          },
         },
-      },
-    );
+      );
+    }
+    return this.supabase;
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -46,7 +51,8 @@ export class SupabaseAuthGuard implements CanActivate {
       throw new UnauthorizedException("Invalid bearer token.");
     }
 
-    const { data, error } = await this.supabase.auth.getUser(token);
+    const supabase = this.getSupabaseClient();
+    const { data, error } = await supabase.auth.getUser(token);
     if (error || !data.user) {
       throw new UnauthorizedException("Invalid or expired token.");
     }

@@ -14,6 +14,8 @@ const SECONDARY_TIMEOUT_MS = 30_000;  // OpenRouter — more lenient
 const FALLBACK_ANSWER =
   "Support AI is currently busy. Please try again in a few minutes or contact support@scriptspay.dev.";
 
+const FORBIDDEN_CHARS_REGEX = /[#*|`]/g;
+
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
@@ -70,7 +72,7 @@ export class AiService {
       this.logger.log(
         `[Groq] AI analysis ok — merchant=${merchantId} logs=${logs.length}`,
       );
-      return { answer };
+      return { answer: this.sanitizeAnswer(answer) };
     } catch (err) {
       this.logger.warn(
         `[Groq] Primary failed: ${err instanceof Error ? err.message : err} — trying OpenRouter`,
@@ -95,7 +97,7 @@ export class AiService {
       this.logger.log(
         `[OpenRouter] Backup AI analysis ok — merchant=${merchantId} logs=${logs.length}`,
       );
-      return { answer };
+      return { answer: this.sanitizeAnswer(answer) };
     } catch (err) {
       this.logger.error(
         `[OpenRouter] Backup also failed: ${err instanceof Error ? err.message : err}`,
@@ -209,17 +211,47 @@ export class AiService {
     return [
       "You are an expert technical support engineer for Scripts Pay, an enterprise payment gateway sandbox.",
       "You have deep knowledge of payment processing, REST APIs, HMAC-SHA256 webhook verification, idempotency keys, and common developer integration mistakes.",
+      "Do not fabricate products, domains, emails, phone numbers, endpoints, events, or timelines.",
+      "If a detail is not in the logs or known contract below, say: 'Detail not available in current contract.'",
       "",
       "Your task:",
       "1. Analyze the merchant's recent API request logs provided below.",
       "2. Identify the root cause of any errors (HTTP 4xx/5xx, missing headers, malformed payloads, HMAC failures, etc.).",
       "3. Provide a clear, actionable fix with code examples where helpful.",
-      "4. If no errors are visible, answer the merchant's question using your payment gateway expertise.",
-      "5. Be concise but thorough. Use markdown formatting for readability.",
+      "4. If no errors are visible, answer only with verified details from the known contract and logs.",
+      "5. Output must be plain text only, no markdown, no HTML, no code fences.",
+      "6. Never use these characters in output: # * | `",
+      "",
+      "Known contract (verified):",
+      "- API base path: /api/v1",
+      "- Create checkout: POST /api/v1/checkout/create (auth via x-api-key or bearer where applicable)",
+      "- Checkout status: GET /api/v1/checkout/{checkoutId} and GET /api/v1/checkout/{checkoutId}/status",
+      "- Hosted browser page: GET /checkout/{checkoutId} returns HTML page",
+      "- Compat JSON mode: GET /checkout/{checkoutId}?format=json",
+      "- Checkout status semantics: pending or completed or failed or refunded",
+      "- isFinal is false only for pending",
+      "- Webhook signature header: x-webhook-signature",
+      "- Do not mention settlement timelines unless explicitly present in logs/context",
       "",
       "<LogsContext>",
       formattedLogs,
       "</LogsContext>",
     ].join("\n");
+  }
+
+  private sanitizeAnswer(answer: string): string {
+    const normalized = answer
+      .replace(/```[\s\S]*?```/g, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(FORBIDDEN_CHARS_REGEX, " ")
+      .replace(/[ \t]+/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+
+    if (!normalized) {
+      return "Detail not available in current contract.";
+    }
+
+    return normalized;
   }
 }

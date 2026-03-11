@@ -25,6 +25,7 @@ import {
 // For the sandbox, we use a deterministic UUID that represents the
 // Scripts_ platform's internal account (the "other side" of every txn).
 const SYSTEM_ACCOUNT_ID = "00000000-0000-0000-0000-000000000000";
+const SYSTEM_ACCOUNT_EMAIL = "system@scripts.local";
 
 // ── Redis TTL for idempotency cache (24 hours in seconds) ────────────
 const IDEMPOTENCY_TTL = 60 * 60 * 24;
@@ -119,7 +120,7 @@ export class PaymentService {
   // ════════════════════════════════════════════════════════════════════
 
   private resolveTransactionStatus(amount: number): TxStatus {
-    // AI.md §3 — Magic Test Data:
+    // Magic Test Data:
     //   10000 → instant success
     //   40000 → insufficient_funds failure
     //   50408 → 30-second bank timeout (stays PENDING)
@@ -134,6 +135,20 @@ export class PaymentService {
       default:
         return "SUCCEEDED";
     }
+  }
+
+  private async ensureSystemAccount(): Promise<void> {
+    await this.prisma.user.upsert({
+      where: { id: SYSTEM_ACCOUNT_ID },
+      update: {
+        email: SYSTEM_ACCOUNT_EMAIL,
+      },
+      create: {
+        id: SYSTEM_ACCOUNT_ID,
+        email: SYSTEM_ACCOUNT_EMAIL,
+        role: "ADMIN",
+      },
+    });
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -153,6 +168,8 @@ export class PaymentService {
       where: { id: tx.merchantId },
       select: { userId: true },
     });
+
+    await this.ensureSystemAccount();
 
     await this.ledgerService.recordDoubleEntry(
       merchant.userId,       // credit (money IN for merchant)

@@ -146,6 +146,25 @@ export class PaymentService {
     return transaction;
   }
 
+  /**
+   * Sandbox helper: mark a PENDING transaction as SUCCEEDED, record
+   * ledger entries, and dispatch the payment_intent.succeeded webhook.
+   * Idempotent — returns existing transaction if already final.
+   */
+  async sandboxCompleteTransaction(txId: string): Promise<Transaction> {
+    const tx = await this.getTransactionById(txId);
+    if (tx.status !== "PENDING") return tx;
+
+    const updated = await this.prisma.transaction.update({
+      where: { id: txId },
+      data: { status: "SUCCEEDED" },
+    });
+
+    await this.handleSuccess(updated);
+    this.logger.log(`Sandbox auto-completed transaction: id=${txId}`);
+    return updated;
+  }
+
   // ════════════════════════════════════════════════════════════════════
   // PRIVATE — Magic Test Data resolver
   // ════════════════════════════════════════════════════════════════════

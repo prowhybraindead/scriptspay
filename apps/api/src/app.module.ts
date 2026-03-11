@@ -1,5 +1,5 @@
 import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
+import { ConfigModule, ConfigService } from "@nestjs/config";
 import { ThrottlerModule } from "@nestjs/throttler";
 import { BullModule } from "@nestjs/bullmq";
 import { HealthModule } from "./modules/health/health.module";
@@ -15,13 +15,16 @@ import { AiModule } from "./modules/support-ai/ai.module";
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
-    BullModule.forRoot({
-      connection: {
-        host: process.env.REDIS_HOST ?? "localhost",
-        port: parseInt(process.env.REDIS_PORT ?? "6379", 10),
-        password: process.env.REDIS_PASSWORD,
-        tls: process.env.REDIS_TLS === "true" ? {} : undefined,
-      },
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        connection: {
+          host: config.getOrThrow<string>("REDIS_HOST"),
+          port: config.get<number>("REDIS_PORT", 6379),
+          password: config.get<string>("REDIS_PASSWORD"),
+          tls: config.get<string>("REDIS_TLS") === "true" ? {} : undefined,
+        },
+      }),
     }),
     PrismaModule,
     RedisModule,

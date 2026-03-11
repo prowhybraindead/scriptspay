@@ -11,7 +11,7 @@ export const REDIS_CLIENT = "REDIS_CLIENT";
       provide: REDIS_CLIENT,
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const host = config.get<string>("REDIS_HOST", "localhost");
+        const host = config.getOrThrow<string>("REDIS_HOST");
         const port = config.get<number>("REDIS_PORT", 6379);
         const password = config.get<string>("REDIS_PASSWORD");
         const useTls = config.get<string>("REDIS_TLS") === "true";
